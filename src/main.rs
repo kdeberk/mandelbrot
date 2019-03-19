@@ -11,6 +11,7 @@ struct Config {
     re_end: f64,
     im_start: f64,
     im_end: f64,
+    output: String,
 }
 
 
@@ -18,18 +19,21 @@ fn main() {
     let config = parse_args();
     let mut image = raster::Image::blank(config.width, config.height);
 
+    let re_step = (config.re_end - config.re_start) / config.width as f64;
+    let im_step = (config.im_end - config.im_start) / config.height as f64;
+
     for x in 0..config.width {
         for y in 0..config.height {
             let m = mandelbrot(
-                config.re_start + (x as f64 / config.width as f64) * (config.re_end - config.re_start),
-                config.im_start + (y as f64 / config.height as f64) * (config.im_end - config.im_start),
+                config.re_start + x as f64 * re_step,
+                config.im_start + y as f64 * im_step,
                 config.max_depth,
             );
 
             image.set_pixel(x, y, map_to_color(m, &config)).unwrap();
         }
     }
-    raster::save(&image, "/tmp/mandelbrot.png").unwrap();
+    raster::save(&image, &config.output).unwrap();
 }
 
 
@@ -42,6 +46,7 @@ fn parse_args() -> Config {
         .arg(clap::Arg::with_name("re_end").long("re-end").takes_value(true))
         .arg(clap::Arg::with_name("im_start").long("im-start").takes_value(true))
         .arg(clap::Arg::with_name("im_end").long("im-end").takes_value(true))
+        .arg(clap::Arg::with_name("output").short("O").long("output").takes_value(true))
         .get_matches();
 
     Config {
@@ -52,8 +57,10 @@ fn parse_args() -> Config {
         re_end: matches.value_of("re_start").unwrap_or("1.0").parse().unwrap(),
         im_start: matches.value_of("re_start").unwrap_or("-1.0").parse().unwrap(),
         im_end: matches.value_of("re_start").unwrap_or("1.0").parse().unwrap(),
+        output: String::from(matches.value_of("output").unwrap_or("mandelbrot.png")),
     }
 }
+
 
 fn mandelbrot(x: f64, y: f64, max_depth: u64) -> f64 {
     let c = Complex::new(x, y);
@@ -76,7 +83,7 @@ const MAX_HSV_VALUE:f32 = 100.0;
 
 fn map_to_color(mandelbrot: f64, config: &Config) -> raster::Color {
     let rgb = raster::Color::to_rgb(
-        (MAX_HSV_HUE as f64 * mandelbrot as f64 / config.max_depth as f64) as u16,
+        (MAX_HSV_HUE as f64 * mandelbrot / config.max_depth as f64) as u16,
         MAX_HSV_SATURATION,
         if mandelbrot < config.max_depth as f64 { MAX_HSV_VALUE } else { 0.0 },
     );
